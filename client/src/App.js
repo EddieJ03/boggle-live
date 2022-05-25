@@ -1,5 +1,7 @@
 import io from 'socket.io-client'
 import { useState, useEffect } from 'react'
+import ToastContainer from 'react-bootstrap/ToastContainer'
+import Toast from 'react-bootstrap/Toast'
 import Board from './Board.js'
 import './App.css';
 
@@ -12,7 +14,7 @@ let playerNumber;
 let validWords = [], playerWords = [], oppWords = [];
 
 function App() {
-  // 0 is home, 1 is playing, 2 is game results
+  // 0 is home, 1 is playing, 2 is game results, 3 is disconnected
   const [state, setState] = useState(0);
   const [gameCode, setGameCode] = useState('');
   const [time, setTime] = useState(-1);
@@ -55,6 +57,13 @@ function App() {
 
   const [pairsMarked, setPairsMarked] = useState([]);
 
+  // modal state
+  const [showA, setShowA] = useState(false);
+
+  const toggleShowA = () => setShowA(!showA);
+
+  const [modalText, setModalText] = useState("Good Selection!");
+
   function newFalse() {
     let y = Array(NUM);
 
@@ -78,6 +87,7 @@ function App() {
     });
 
     socket.on('start', (data) => {
+      setShowA(false);
       setEnterCode('');
       setState(1);
       setWaiting(false);
@@ -99,8 +109,6 @@ function App() {
       } else {
         setOppScore(data.player1);
       }
-      console.log(playerWords);
-      console.log(oppWords);
     });
 
     socket.on('init', data => {
@@ -112,6 +120,10 @@ function App() {
     socket.on('switch', data => {
       setTurn(playerNumber === data.player);
       oppWords = [...oppWords, data.word];
+    });
+
+    socket.on('disconnected', () => {
+      setState(3);
     });
   }, [socket]);
 
@@ -132,8 +144,9 @@ function App() {
   }
 
   function nearProperly() {
-    for(let i = 1; i < pairsMarked.length; i++) {
-      if(Math.abs(pairsMarked[i - 1][0] - pairsMarked[i][0]) > 1 || Math.abs(pairsMarked[i][1]- pairsMarked[i - 1][1]) > 1) {
+    for (let i = 1; i < pairsMarked.length; i++) {
+      if (Math.abs(pairsMarked[i - 1][0] - pairsMarked[i][0]) > 1 ||
+         Math.abs(pairsMarked[i][1]- pairsMarked[i - 1][1]) > 1) {
         return false;
       }
     }
@@ -141,20 +154,20 @@ function App() {
   }
 
   function validateSelection() {
-    if(word.length < 3) {
-//       setModalText("Word Length Must Be At Least 3")
+    if (word.length < 3) {
+      setModalText("Word Length Must Be At Least 3");
       return false;
-    } else if(!nearProperly()) {
-//       setModalText("Letters Should Be Adjacent Or Diagonal In Given Order!")
+    } else if (!nearProperly()) {
+      setModalText("Letters Should Be Adjacent Or Diagonal In Given Order!");
       return false;
-    } else if(!validWords.includes(word.toUpperCase())) {
-//       setModalText("Word Not In Dictionary")
+    } else if (!validWords.includes(word.toUpperCase())) {
+      setModalText("Word Not In Dictionary");
       return false;
-    } else if(oppWords.includes(word) || playerWords.includes(word)) {
-//       setModalText("Word Already Found")
+    } else if (oppWords.includes(word) || playerWords.includes(word)) {
+      setModalText("Word Already Found");
       return false;
     } else {
-//       setModalText("Good Selection!")
+      setModalText("Good Selection!");
       return true;
     }
   }
@@ -163,6 +176,8 @@ function App() {
     if(!validateSelection()) {
       return;
     }
+
+    setShowA(true);
 
     let score = playerScore;
 
@@ -178,9 +193,10 @@ function App() {
       score += 11;
     }
 
+    socket.emit('submitWord', {word: word, score: score});
+
     playerWords = [...playerWords, word];
     setPlayerScore(score);
-    socket.emit('submitWord', {word: word, score: score});
     setTurn(false);
     clear();
   }
@@ -209,59 +225,82 @@ function App() {
       state !== 0 ? 
       (
         state === 1 ? 
-        <div className="d-flex flex-column justify-content-center align-items-center">
-            <h1>{time}</h1>
-
-            <h4 style={{float: 'right', marginTop: '5px'}}>
-              Score: {playerScore}
-            </h4>
-
-            <h4 style={{float: 'right', marginTop: '5px'}}>
-              WORD: {word}
-            </h4>
-
-            <Board player={turn} characters={characters} booleanMarked={booleanMarked} setBooleanMarked={setBooleanMarked} setWord={setWord} pairsMarked={pairsMarked} setPairsMarked={setPairsMarked}/>
-
-            <div className="d-flex align-content-start flex-wrap" style={{
-              height: '200px', 
-              width: '400px', 
-              border: '5px solid black', marginBottom: '5px'}}>
-              {playerWords.map((word, val) => 
-                <p key={val} style={{margin: '2px'}}>
-                  {word.toUpperCase()}
-                </p>
-              )}
-            </div>
-
-            <button onClick={clear} className={`btn btn-secondary ${!turn ? 'disabled' : ''} mb-1`}>
-              Clear
-            </button>
-
-            <button type="button" className={`btn btn-secondary ${!turn ? 'disabled' : ''}`} onClick={submitWord}>
-              Select Word
-            </button>
-
-            <h4 style={{textAlign: 'center', marginTop: '15px'}}>
-              Total Possible Score: {maxPossibleScore}
-            </h4>
-        </div>
-        : 
         <>
-            <div className="d-flex flex-column vh-100 align-items-center justify-content-center">
-              <h2 style={{textAlign: 'center'}}>{playerScore > oppScore ? `You Win!` : (playerScore < oppScore ? `You Lose` : "It is a tie!")}</h2> 
-                  <div className="d-flex justify-content-center align-items-center flex-column">
-                    <div className="d-flex align-content-center flex-wrap" style={{height: '200px', width: '650px', border: '5px solid black', overflowY: 'scroll'}}>
-                        {validWords.map((word, val) => 
-                        <p key={val} style={{margin: '4px', color: playerWords.includes(word) ? "green" : (oppWords.includes(word) ? "red" : "black")}}>{word.toUpperCase()}</p>)}
-                    </div>
-                    <h3 style={{textAlign: 'center', paddingTop: '5px'}}>
-                    <span style={{color: 'black'}}>BLACK</span> means not found, <span style={{color: 'red'}}>RED</span> means words opponent found, and <span style={{color: 'green'}}>GREEN</span> means words you found</h3>
-                  </div>
-                <button type="button" className={`btn btn-secondary`} onClick={() => setState(0)}>
-                  Home
-                </button>
-            </div>
+          <div className="d-flex flex-column justify-content-center align-items-center">
+              <h1>{time}</h1>
+
+              <h4 style={{float: 'right', marginTop: '5px'}}>
+                Score: {playerScore}
+              </h4>
+
+              <h4 style={{float: 'right', marginTop: '5px'}}>
+                WORD: {word}
+              </h4>
+
+              <Board player={turn} characters={characters} booleanMarked={booleanMarked} setBooleanMarked={setBooleanMarked} setWord={setWord} pairsMarked={pairsMarked} setPairsMarked={setPairsMarked}/>
+
+              <div className="d-flex align-content-start flex-wrap" style={{
+                height: '200px', 
+                width: '400px', 
+                border: '5px solid black', marginBottom: '5px'}}>
+                {playerWords.map((word, val) => 
+                  <p key={val} style={{margin: '2px'}}>
+                    {word.toUpperCase()}
+                  </p>
+                )}
+              </div>
+
+              <button onClick={clear} className={`btn btn-secondary ${!turn ? 'disabled' : ''} mb-1`}>
+                Clear
+              </button>
+
+              <button type="button" className={`btn btn-secondary ${!turn ? 'disabled' : ''}`} onClick={submitWord}>
+                Select Word
+              </button>
+
+              <h4 style={{textAlign: 'center', marginTop: '15px'}}>
+                Total Possible Score: {maxPossibleScore}
+              </h4>
+          </div>
+          <ToastContainer style={{marginTop: '12vh', marginRight: '10px'}} position="top-end">
+              <Toast bg={modalText === "Good Selection!" ? "success" : "danger"} show={showA} onClose={toggleShowA} delay={1000} autohide>
+                <Toast.Header>
+                </Toast.Header>
+                <Toast.Body>
+                  <b>{modalText}</b>
+                </Toast.Body>
+              </Toast>
+          </ToastContainer>
         </>
+        : 
+        (
+          state !== 2 ? 
+          <>
+            <div className="d-flex flex-column justify-content-center align-items-center vh-100">
+              <h2 style={{textAlign: 'center'}}>Opponent Disconnected!</h2> 
+              <button type="button" className={`btn btn-secondary`} onClick={() => setState(0)}>
+                Home
+              </button>
+            </div>
+          </> 
+          : 
+          <>
+              <div className="d-flex flex-column vh-100 align-items-center justify-content-center">
+                <h2 style={{textAlign: 'center'}}>{playerScore > oppScore ? `You Win!` : (playerScore < oppScore ? `You Lose` : "It is a tie!")}</h2> 
+                    <div className="d-flex justify-content-center align-items-center flex-column">
+                      <div className="d-flex align-content-center flex-wrap" style={{height: '200px', width: '650px', border: '5px solid black', overflowY: 'scroll'}}>
+                          {validWords.map((word, val) => 
+                          <p key={val} style={{margin: '4px', color: playerWords.includes(word) ? "green" : (oppWords.includes(word) ? "red" : "black")}}>{word.toUpperCase()}</p>)}
+                      </div>
+                      <h3 style={{textAlign: 'center', paddingTop: '5px'}}>
+                      <span style={{color: 'black'}}>BLACK</span> means not found, <span style={{color: 'red'}}>RED</span> means words opponent found, and <span style={{color: 'green'}}>GREEN</span> means words you found</h3>
+                    </div>
+                  <button type="button" className={`btn btn-secondary`} onClick={() => setState(0)}>
+                    Home
+                  </button>
+              </div>
+          </>
+        )
       ) 
       : 
       <div id="initialScreen" className="d-flex flex-column align-items-center justify-content-around vh-100">

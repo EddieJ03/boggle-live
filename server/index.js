@@ -30,19 +30,18 @@ class Tile {
     }
 }
 
-io.on('connection', client => {
-    let timerId;
-    
+io.on('connection', client => {    
     client.on('newGame', newGame);
     client.on('joinGame', joinGame);
     client.on('submitWord', submitWord);
     client.on('disconnect', () => {
       if(client.roomName) {
-        clearInterval(timerId);
         let gameData = clientRooms[client.roomName];
+        clearInterval(gameData.timerId);
+        clearTimeout(gameData.timeOut);
         if(gameData) {
           io.sockets.in(client.roomName)
-                .emit('endgame', {player1: gameData.player1, player2: gameData.player2});
+                .emit('disconnected');
           delete clientRooms[client.roomName];
         }
       }
@@ -264,7 +263,8 @@ io.on('connection', client => {
     }
 
     function startGame(roomName) {
-        let countdown = 179;
+        let countdown = 19;
+        let room = clientRooms[roomName];
 
         io.sockets.in(roomName)
             .emit('start', {
@@ -272,19 +272,22 @@ io.on('connection', client => {
                 gameInfo: clientRooms[roomName]
             });
 
-        timerId = setInterval(() => {
+        let timerId = setInterval(() => {
             io.sockets.in(roomName)
                 .emit('time', countdown--);
         }, 1100);
 
         // after x number of seconds stop
-        setTimeout(() => { 
+        let timeOut = setTimeout(() => { 
             clearInterval(timerId);  
             let gameData = clientRooms[client.roomName];
             io.sockets.in(client.roomName)
                 .emit('endgame', {player1: gameData.player1, player2: gameData.player2});
             delete clientRooms[roomName];
-        }, 180 * 1100);
+        }, 20 * 1100);
+
+        room.timerId = timerId;
+        room.timeOut = timeOut;
     }
 
     // data.word - word selected
