@@ -8,7 +8,7 @@ const app = express();
 const http = require('http');
 const { Server } = require('socket.io');
 app.use(require('cors')());
-const server = http.createServer(app)
+const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: "http://localhost:3000",
@@ -21,7 +21,6 @@ const NUM = 4;
 // map room to array of characters, all valid words, and total possible score
 const clientRooms = {};
 const commonTrie = new Trie();
-
 
 class Tile {
     constructor(iVal, jVal) {
@@ -263,18 +262,28 @@ io.on('connection', client => {
     }
 
     function startGame(roomName) {
-        let countdown = 19;
+        let minute = 2;
+        let seconds = 59;
+
+        let countdown = 180;
+
         let room = clientRooms[roomName];
 
         io.sockets.in(roomName)
             .emit('start', {
-                countdown: countdown + 1, 
+                countdown: [3, 0], 
                 gameInfo: clientRooms[roomName]
             });
 
         let timerId = setInterval(() => {
             io.sockets.in(roomName)
-                .emit('time', countdown--);
+                .emit('time', [minute, seconds]);
+            if(seconds === 0) {
+                seconds = 59;
+                minute -= 1;
+            } else {
+                seconds -= 1;
+            }
         }, 1100);
 
         // after x number of seconds stop
@@ -284,14 +293,12 @@ io.on('connection', client => {
             io.sockets.in(client.roomName)
                 .emit('endgame', {player1: gameData.player1, player2: gameData.player2});
             delete clientRooms[roomName];
-        }, 20 * 1100);
+        }, countdown * 1000);
 
         room.timerId = timerId;
         room.timeOut = timeOut;
     }
 
-    // data.word - word selected
-    // data.score - score of client
     function submitWord(data) {
         let room = clientRooms[client.roomName];
 

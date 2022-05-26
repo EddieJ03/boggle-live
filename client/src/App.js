@@ -17,7 +17,8 @@ function App() {
   // 0 is home, 1 is playing, 2 is game results, 3 is disconnected
   const [state, setState] = useState(0);
   const [gameCode, setGameCode] = useState('');
-  const [time, setTime] = useState(-1);
+  const [minute, setMinute] = useState(-1);
+  const [second, setSecond] = useState(-1);
   const [enterCode, setEnterCode] = useState('');
 
   // track player turn
@@ -91,7 +92,8 @@ function App() {
       setEnterCode('');
       setState(1);
       setWaiting(false);
-      setTime(data.countdown);
+      setMinute(data.countdown[0]);
+      setSecond(data.countdown[1]);
       validWords = data.gameInfo.allValidWords;
       // setValidWords(allValidWords);
       setMaxPossibleScore(data.gameInfo.totalScore);
@@ -99,7 +101,8 @@ function App() {
     });
 
     socket.on('time', (data) => {
-      setTime(data);
+      setMinute(data[0]);
+      setSecond(data[1]);
     });
 
     socket.on('endgame', data => {
@@ -123,6 +126,7 @@ function App() {
     });
 
     socket.on('disconnected', () => {
+      emptyEverything();
       setState(3);
     });
   }, [socket]);
@@ -174,6 +178,7 @@ function App() {
 
   function submitWord() {
     if(!validateSelection()) {
+      setShowA(true);
       return;
     }
 
@@ -227,7 +232,7 @@ function App() {
         state === 1 ? 
         <>
           <div className="d-flex flex-column justify-content-center align-items-center">
-              <h1>{time}</h1>
+              <h1>{minute}:{second <= 9 ? `0${second}` : second}</h1>
 
               <h4 style={{float: 'right', marginTop: '5px'}}>
                 Score: {playerScore}
