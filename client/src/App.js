@@ -5,15 +5,15 @@ import Toast from 'react-bootstrap/Toast'
 import Board from './Board.js'
 import './App.css';
 
-// initialize client socket
-const socket = io.connect("http://localhost:8000");
-
 const NUM  = 4;
 
 let playerNumber;
 let validWords = [], playerWords = [], oppWords = [];
 
 function App() {
+  // initialize socket
+  const [socket, setSocket] = useState(null);
+
   // 0 is home, 1 is playing, 2 is game results, 3 is disconnected
   const [state, setState] = useState(0);
 
@@ -24,17 +24,12 @@ function App() {
 
   // track player turn
   const [turn, setTurn] = useState(false);
-
-  // player number (1 or 2)
-  // const [playerNumber, setPlayerNumber] = useState(0);
   
   // waiting for other player
   const [waiting, setWaiting] = useState(false);
 
   // characters on board
   const [characters, setCharacters] = useState([]);
-
-  // const [validWords, setValidWords] = useState([]);
 
   // word player enters
   const [word, setWord] = useState('');
@@ -58,9 +53,7 @@ function App() {
 
   // modal state
   const [showA, setShowA] = useState(false);
-
   const toggleShowA = () => setShowA(!showA);
-
   const [modalText, setModalText] = useState("Good Selection!");
 
   function newFalse() {
@@ -99,12 +92,17 @@ function App() {
   }, [playerTimeLeft, turn, state])
 
   useEffect(() => {
-    socket.on('gameCode', (data) => {
+    // initialize client socket
+    const newSocket = io.connect("http://localhost:8000");
+
+    setSocket(newSocket);
+
+    newSocket.on('gameCode', (data) => {
       setGameCode(data);
       setWaiting(true);
     });
 
-    socket.on('start', (data) => {
+    newSocket.on('start', (data) => {
       setState(1);
       setMinute(data.countdown[0]);
       setSecond(data.countdown[1]);
@@ -116,12 +114,12 @@ function App() {
       setCharacters(data.gameInfo.allCharacters);
     });
 
-    socket.on('time', (data) => {
+    newSocket.on('time', (data) => {
       setMinute(data[0]);
       setSecond(data[1]);
     });
 
-    socket.on('endgame', data => {
+    newSocket.on('endgame', data => {
       setState(2);
       if(playerNumber === 1) {
         setOppScore(data.player2);
@@ -130,24 +128,26 @@ function App() {
       }
     });
 
-    socket.on('init', data => {
+    newSocket.on('init', data => {
       if(data === 1) {
         setTurn(true);
       }
     });
 
-    socket.on('switch', data => {
+    newSocket.on('switch', data => {
       setTurn(playerNumber === data.player);
       if(data.word.length >= 3) {
         oppWords = [...oppWords, data.word];
       }
     });
 
-    socket.on('disconnected', () => {
+    newSocket.on('disconnected', () => {
       emptyEverything();
       setState(3);
     });
-  }, [socket]);
+
+    return () => newSocket.close();
+  }, []);
 
   function newGame() {
     emptyEverything();
