@@ -16,6 +16,7 @@ let validWords = [], playerWords = [], oppWords = [];
 function App() {
   // 0 is home, 1 is playing, 2 is game results, 3 is disconnected
   const [state, setState] = useState(0);
+
   const [gameCode, setGameCode] = useState('');
   const [minute, setMinute] = useState(-1);
   const [second, setSecond] = useState(-1);
@@ -47,11 +48,8 @@ function App() {
   // opponent score
   const [oppScore, setOppScore] = useState(0);
 
-  // words this player chose
-  // const [playerWords, setPlayerWords] = useState([]);
-
-  // opponents words
-  // const [oppWords, setOppWords] = useState([]);
+  // player independent timer - 15s
+  const [playerTimeLeft, setPlayerTimeLeft] = useState(15);
 
   // clicked cells on board
   const [booleanMarked, setBooleanMarked] = useState(newFalse());
@@ -81,6 +79,25 @@ function App() {
     return y;
   }
 
+  // personal timer - 15 seconds
+  useEffect(() => {
+    if (state === 1 && turn) {
+      if (playerTimeLeft === 0) {
+        setPlayerTimeLeft(15);
+        socket.emit('submitWord', {word: '', score: playerScore});
+        setTurn(false);
+        clear();
+      }
+
+      const intervalId = setInterval(() => {
+        setPlayerTimeLeft(playerTimeLeft - 1)
+      }, 1000);
+
+      // clear interval on re-render to avoid memory leaks
+      return () => clearInterval(intervalId);
+    }
+  }, [playerTimeLeft, turn, state])
+
   useEffect(() => {
     socket.on('gameCode', (data) => {
       setGameCode(data);
@@ -88,14 +105,13 @@ function App() {
     });
 
     socket.on('start', (data) => {
-      setShowA(false);
-      setEnterCode('');
       setState(1);
-      setWaiting(false);
       setMinute(data.countdown[0]);
       setSecond(data.countdown[1]);
+      setShowA(false);
+      setEnterCode('');
+      setWaiting(false);
       validWords = data.gameInfo.allValidWords;
-      // setValidWords(allValidWords);
       setMaxPossibleScore(data.gameInfo.totalScore);
       setCharacters(data.gameInfo.allCharacters);
     });
@@ -122,7 +138,9 @@ function App() {
 
     socket.on('switch', data => {
       setTurn(playerNumber === data.player);
-      oppWords = [...oppWords, data.word];
+      if(data.word.length >= 3) {
+        oppWords = [...oppWords, data.word];
+      }
     });
 
     socket.on('disconnected', () => {
@@ -133,17 +151,15 @@ function App() {
 
   function newGame() {
     emptyEverything();
-    playerNumber = 1;
     setTurn(true);
-    // setPlayerNumber(num);
+    playerNumber = 1;
     socket.emit('newGame');
   }
 
   function joinGame() {
+    setTurn(false);
     emptyEverything();
     playerNumber = 2;
-    setTurn(false);
-    // setPlayerNumber(num);
     socket.emit('joinGame', enterCode);
   }
 
@@ -202,6 +218,7 @@ function App() {
 
     playerWords = [...playerWords, word];
     setPlayerScore(score);
+    setPlayerTimeLeft(15);
     setTurn(false);
     clear();
   }
@@ -215,15 +232,13 @@ function App() {
   function emptyEverything() {
     clear();
     setCharacters([]);
-    // setValidWords([]);
-    // setPlayerWords([]);
-    // setOppWords([]);
     playerWords = [];
     oppWords = [];
     setOppScore(0);
     setMaxPossibleScore(0);
     setPlayerScore(0);
     playerNumber = 0;
+    setPlayerTimeLeft(15);
   }
 
   return (
@@ -233,6 +248,8 @@ function App() {
         <>
           <div className="d-flex flex-column justify-content-center align-items-center">
               <h1>{minute}:{second <= 9 ? `0${second}` : second}</h1>
+
+              <h1 className="mb-1">{turn ? `${playerTimeLeft}` : ''}</h1>
 
               <h4 style={{float: 'right', marginTop: '5px'}}>
                 Score: {playerScore}

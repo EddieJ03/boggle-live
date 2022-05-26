@@ -36,9 +36,9 @@ io.on('connection', client => {
     client.on('disconnect', () => {
       if(client.roomName) {
         let gameData = clientRooms[client.roomName];
-        clearInterval(gameData.timerId);
-        clearTimeout(gameData.timeOut);
         if(gameData) {
+          clearInterval(gameData.timerId);
+          clearTimeout(gameData.timeOut);
           io.sockets.in(client.roomName)
                 .emit('disconnected');
           delete clientRooms[client.roomName];
@@ -265,7 +265,7 @@ io.on('connection', client => {
         let minute = 2;
         let seconds = 59;
 
-        let countdown = 180;
+        let countdown = 181;
 
         let room = clientRooms[roomName];
 
@@ -284,7 +284,7 @@ io.on('connection', client => {
             } else {
                 seconds -= 1;
             }
-        }, 1100);
+        }, 1000);
 
         // after x number of seconds stop
         let timeOut = setTimeout(() => { 
