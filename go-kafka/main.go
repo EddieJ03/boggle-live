@@ -37,13 +37,15 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
             return // Exit gracefully if context is canceled
         default:
             m, err := r.ReadMessage(ctx)
-            if err != nil || strings.Contains(string(m.Value), "GAME OVER!") {
-                return // Exit on error or "GAME OVER!"
-            }
 
             c.MessageChan <- map[string]interface{}{
                 "type":    "message",
                 "message": string(m.Value),
+				"topic": topic,
+            }
+			
+            if err != nil || strings.Contains(string(m.Value), "GAME OVER!") {
+                return // Exit on error or "GAME OVER!"
             }
         }
     }
@@ -90,6 +92,8 @@ func (c *WSClient) HandleClient() {
 			continue
 		}
 
+
+		fmt.Println("topic: " + data["topic"].(string))
 		fmt.Println("messageType: " + msgType)
 
 		switch msgType {
