@@ -18,31 +18,34 @@ import (
 type WSClient struct {
 	Conn           *websocket.Conn
 	UniqueNumber   int
+	MessageChan    chan map[string]interface{}
+	CancelCtx 	   context.CancelFunc 
 }
 
-func (c * WSClient) newSpectator(topic string) {
+func (c * WSClient) newSpectator(ctx context.Context, topic string) {
     r := kafka.NewReader(kafka.ReaderConfig{
         Brokers:   []string{"localhost:9094"},
         Topic:     topic,
         Partition: 0,
-        MaxBytes:  10e6, // 10MB
+        MaxBytes:  10e6, 
     })
+	defer r.Close()
 
     for {
-        m, err := r.ReadMessage(context.Background())
+        select {
+        case <-ctx.Done():
+            return // Exit gracefully if context is canceled
+        default:
+            m, err := r.ReadMessage(ctx)
+            if err != nil || strings.Contains(string(m.Value), "GAME OVER!") {
+                return // Exit on error or "GAME OVER!"
+            }
 
-        c.Conn.WriteJSON(map[string]interface{}{
-            "type":    "message",
-            "message": string(m.Value),
-        })
-
-        if err != nil || strings.Contains(string(m.Value), "GAME OVER!") {
-            break
+            c.MessageChan <- map[string]interface{}{
+                "type":    "message",
+                "message": string(m.Value),
+            }
         }
-    }
-
-    if err := r.Close(); err != nil {
-        log.Fatal("failed to close reader:", err)
     }
 }
 func (c *WSClient) HandleClient() {
@@ -51,8 +54,23 @@ func (c *WSClient) HandleClient() {
 
 	c.Conn.SetCloseHandler(func(code int, text string) error {
 		fmt.Printf("%d closed so disconnected\n", c.UniqueNumber)
+		close(c.MessageChan)
 		return nil
 	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+    c.CancelCtx = cancel
+
+	// pipe all messages through a dedicated channel (best if message order is needed, but not necessary for my implementation)
+	go func() {
+        for message := range c.MessageChan {
+            if err := c.Conn.WriteJSON(message); err != nil {
+                log.Println("WebSocket write error:", err)
+                cancel() // Stop all Kafka readers on write failure since no point in reading
+                break
+            }
+        }
+    }()
 
 	for {
 		var data map[string]interface{}
@@ -76,7 +94,7 @@ func (c *WSClient) HandleClient() {
 
 		switch msgType {
 		case "newSpectator":
-			c.newSpectator(data["topic"].(string))
+			go c.newSpectator(ctx, data["topic"].(string))
 		default:
 			continue
 		}
@@ -104,6 +122,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	wsClient := &WSClient{
 		Conn: conn, 
 		UniqueNumber: rand.Int(), 
+		MessageChan: make(chan map[string]interface{}),
 	}
 
 	wsClient.HandleClient()
