@@ -50,6 +50,30 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
         }
     }
 }
+
+func topicExists(topic string) (bool, error) {
+	// Connect to the Kafka broker
+	conn, err := kafka.DialContext(context.Background(), "tcp", "localhost:9094")
+	if err != nil {
+		return false, fmt.Errorf("failed to connect to Kafka broker: %w", err)
+	}
+	defer conn.Close()
+
+	// Fetch metadata
+	partitions, err := conn.ReadPartitions()
+	if err != nil {
+		return false, fmt.Errorf("failed to read partitions: %w", err)
+	}
+
+	// Check if the topic exists in the metadata
+	for _, p := range partitions {
+		if p.Topic == topic {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *WSClient) HandleClient() {
     defer c.Conn.Close()
 	fmt.Printf("%d connected\n", c.UniqueNumber)
@@ -98,14 +122,27 @@ func (c *WSClient) HandleClient() {
 
 		switch msgType {
 		case "newSpectator":
-			go c.newSpectator(ctx, data["topic"].(string))
+			exists, err := topicExists(data["topic"].(string))
+
+			if err != nil {
+				fmt.Printf("Error checking topic existence: %v", err)
+				continue
+			}
+
+			if exists {
+				go c.newSpectator(ctx, data["topic"].(string))
+			} else {
+				c.Conn.WriteJSON(map[string]interface{}{
+					"type":   "nonexistent",
+					"topic":   data["topic"].(string),
+				})
+			}
+			
 		default:
 			continue
 		}
 	}
 }
-
-const NUM = 4
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize: 1024,
