@@ -1,5 +1,6 @@
-# Copyright Broadcom, Inc. All Rights Reserved.
-# SPDX-License-Identifier: APACHE-2.0
+# https://developer.mamezou-tech.com/en/blogs/2024/06/24/kafka-kraft-mode-in-containers/
+
+# single-node configuration that serves as both KRaft controller and Kafka broker
 
 services:
   kafka:
@@ -11,6 +12,7 @@ services:
     environment:
       # KRaft settings
       - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_CONTROLLER_BROKER_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
       # Listeners
