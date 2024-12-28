@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
@@ -16,6 +16,14 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 )
+
+var debug bool
+
+func init() {
+	// Initialize the debug flag from the command line arguments
+	flag.BoolVar(&debug, "debug", false, "Enable debug mode")
+	flag.Parse()
+}
 
 type WSClient struct {
 	Conn           *websocket.Conn
@@ -49,7 +57,7 @@ func topicExists(topic string) (bool, error) {
 }
 
 func (c * WSClient) newSpectator(ctx context.Context, topic string) {
-	fmt.Printf("NEW spectator for topic %s \n", topic)
+	debugPrint(fmt.Sprintf("NEW spectator for topic %s \n", topic))
 
     r := kafka.NewReader(kafka.ReaderConfig{
         Brokers:   []string{"localhost:9094"},
@@ -61,21 +69,21 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
 	c.WaitGroup.Add(1)
 
 	
-	defer fmt.Printf("FINISHED spectator for topic %s \n", topic)
+	defer debugPrint(fmt.Sprintf("FINISHED spectator for topic %s \n", topic))
 	defer c.WaitGroup.Done()
 	defer r.Close()
 
     for {
         select {
         case <-ctx.Done():
-			fmt.Println("EXITING saw context finished")
+			debugPrint("EXITING saw context finished")
             return // Exit gracefully if context is canceled
         default:
             m, err := r.ReadMessage(ctx)
 			
             if err != nil {
 				if errors.Is(err, context.Canceled) {
-					fmt.Println("EXITING saw context CANCELLED ERROR")
+					debugPrint("EXITING saw context CANCELLED ERROR")
 					return
 				}
 
@@ -103,12 +111,12 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
 
 func (c *WSClient) HandleClient() {
     defer c.Conn.Close()
-	fmt.Printf("%d connected\n", c.UniqueNumber)
+	debugPrint(fmt.Sprintf("%d connected\n", c.UniqueNumber))
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c.Conn.SetCloseHandler(func(code int, text string) error {
-		fmt.Printf("%d closed so disconnected\n", c.UniqueNumber)
+		debugPrint(fmt.Sprintf("%d closed so disconnected\n", c.UniqueNumber))
 		cancel()
 		c.WaitGroup.Wait()
 		close(c.MessageChan)
@@ -118,37 +126,35 @@ func (c *WSClient) HandleClient() {
 
 	// pipe all messages through a dedicated channel (best if message order is needed, but not necessary for my implementation)
 	go func() {
-		fmt.Printf("starting infinite read from message channel\n")
+		debugPrint("starting infinite read from message channel\n")
         for message := range c.MessageChan {
             if err := c.Conn.WriteJSON(message); err != nil {
-                log.Println("WebSocket write error:", err)
+                debugPrint(fmt.Sprintf("WebSocket write error: %v", err))
                 cancel() // Stop all Kafka readers on write failure since no point in reading
                 break
             }
         }
-		fmt.Printf("finished infinite read from message channel\n")
+		debugPrint("finished infinite read from message channel\n")
     }()
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("%d context canceled so disconnecting\n", c.UniqueNumber)
+			debugPrint(fmt.Sprintf("%d context canceled so disconnecting\n", c.UniqueNumber))
         	return
 		default:
 			var data map[string]interface{}
 
 			err := c.Conn.ReadJSON(&data)
 			if err != nil {
-				fmt.Printf("%d error so disconnected\n", c.UniqueNumber)
-
+				debugPrint(fmt.Sprintf("%d error so disconnected\n", c.UniqueNumber))
 				cancel()
-
 				return
 			}
 
 			msgType, ok := data["type"].(string)
 			if !ok {
-				fmt.Printf("%s is invalid type for message Type\n", msgType)
+				debugPrint(fmt.Sprintf("%s is invalid type for message Type\n", msgType))
 				continue
 			}
 
@@ -157,7 +163,7 @@ func (c *WSClient) HandleClient() {
 				exists, err := topicExists(data["topic"].(string))
 
 				if err != nil {
-					fmt.Printf("Error checking topic existence: %v", err)
+					debugPrint(fmt.Sprintf("Error checking topic existence: %v", err))
 					continue
 				}
 
@@ -203,6 +209,12 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	if debug {
+		fmt.Println("Debug mode enabled")
+	} else {
+		fmt.Println("Debug mode not enabled")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleConnections)
 	handler := cors.Default().Handler(mux)
@@ -212,7 +224,17 @@ func main() {
 		Handler: handler,
 	}
 
-	fmt.Println("Server is running on port 8080!")
+	infoPrint("Server is running on port 8080!")
 
 	server.ListenAndServe()
+}
+
+func debugPrint(message string) {
+	if debug {
+		fmt.Println("DEBUG:", message)
+	}
+}
+
+func infoPrint(message string) {
+	fmt.Println("INFO:", message) // Always prints
 }
