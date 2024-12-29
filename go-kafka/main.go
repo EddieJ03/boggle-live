@@ -72,8 +72,8 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
 	c.WaitGroup.Add(1)
 	
 	defer debugPrint(fmt.Sprintf("FINISHED spectator for topic %s \n", topic))
-	defer c.WaitGroup.Done()
 	defer r.Close()
+	defer c.WaitGroup.Done()
 
     for {
         select {
@@ -131,8 +131,9 @@ func (c *WSClient) HandleClient() {
         for message := range c.MessageChan {
             if err := c.Conn.WriteJSON(message); err != nil {
                 debugPrint(fmt.Sprintf("WebSocket write error: %v", err))
-                cancel() // Stop all Kafka readers on write failure since no point in reading
-                break
+                cancel() // Stop all current Kafka readers on write failure since no point in reading
+
+				// however we can keep looping in case write succeeds later
             }
         }
 		debugPrint("finished infinite read from message channel\n")
