@@ -70,7 +70,6 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
     })
 
 	c.WaitGroup.Add(1)
-
 	
 	defer debugPrint(fmt.Sprintf("FINISHED spectator for topic %s \n", topic))
 	defer c.WaitGroup.Done()
@@ -126,7 +125,6 @@ func (c *WSClient) HandleClient() {
 		return nil
 	})
 
-
 	// pipe all messages through a dedicated channel (best if message order is needed, but not necessary for my implementation)
 	go func() {
 		debugPrint("starting infinite read from message channel\n")
@@ -149,9 +147,13 @@ func (c *WSClient) HandleClient() {
 			var data map[string]interface{}
 
 			err := c.Conn.ReadJSON(&data)
-			if err != nil {
-				debugPrint(fmt.Sprintf("%d error so disconnected\n", c.UniqueNumber))
+			if err != nil && websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+				debugPrint(fmt.Sprintf("application or protocol error so disconnected %v\n", err))
+
 				cancel()
+				c.WaitGroup.Wait()
+				close(c.MessageChan)
+				
 				return
 			}
 
