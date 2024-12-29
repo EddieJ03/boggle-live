@@ -19,6 +19,9 @@ import (
 
 var debug bool
 
+// change this endpoint depending on where server is (ex: localhost:9094)
+var endpoint string = "52.160.91.109:9094"
+
 func init() {
 	// Initialize the debug flag from the command line arguments
 	flag.BoolVar(&debug, "debug", false, "Enable debug mode")
@@ -34,7 +37,7 @@ type WSClient struct {
 
 func topicExists(topic string) (bool, error) {
 	// Connect to the Kafka broker
-	conn, err := kafka.DialContext(context.Background(), "tcp", "localhost:9094")
+	conn, err := kafka.DialContext(context.Background(), "tcp", endpoint)
 	if err != nil {
 		return false, fmt.Errorf("failed to connect to Kafka broker: %w", err)
 	}
@@ -60,7 +63,7 @@ func (c * WSClient) newSpectator(ctx context.Context, topic string) {
 	debugPrint(fmt.Sprintf("NEW spectator for topic %s \n", topic))
 
     r := kafka.NewReader(kafka.ReaderConfig{
-        Brokers:   []string{"localhost:9094"},
+        Brokers:   []string{endpoint},
         Topic:     topic,
         Partition: 0,
         MaxBytes:  10e6, 
