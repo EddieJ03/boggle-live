@@ -169,7 +169,10 @@ func (c *WSClient) HandleClient() {
 				exists, err := topicExists(data["topic"].(string))
 
 				if err != nil {
-					debugPrint(fmt.Sprintf("Error checking topic existence: %v", err))
+					c.Conn.WriteJSON(map[string]interface{}{
+						"type":   "error",
+						"message": "Failed to check if " + data["topic"].(string) + " exists. Kafka cluster likely down.",
+					})
 					continue
 				}
 
