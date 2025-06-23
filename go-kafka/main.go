@@ -20,7 +20,7 @@ import (
 var debug bool
 
 // change this endpoint depending on where server is (ex: localhost:9094)
-var endpoint string = "37.117.12.142:9094"
+var endpoint string = "137.117.12.142:9094"
 
 func init() {
 	// Initialize the debug flag from the command line arguments
