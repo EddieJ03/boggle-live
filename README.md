@@ -1,9 +1,14 @@
-# Go Kafka Server
+# Go Backend
 
-Server that will stream real-time events from Kafka to spectator clients.
+To build Boggle Kafka server: 
+- cd into `boggle-kafka` then run `go build`
+- If building for Docker container, prefix above command with `GOOS=linux GOARCH=amd64 `
 
-To start Kafka container: `docker-compose up`
+To build Boggle Backend server: 
+- cd into `boggle-backend` then run `go build`
+- If building for Docker container, prefix above command with `GOOS=linux GOARCH=amd64 `
 
-To run the server, first go into `go-kafka` directory:
-- To compile: `go build`
-- To run in debug mode: `go-kafka.exe -debug`
+To build docker image: `docker build -t redpanda-ws . --no-cache`
+- if no file changes, can ignore adding `--no-cache`
+
+To run docker image: `docker run --rm -p 5050:5050 -p 7001:7001 -p 9092:9092 redpanda-ws`
