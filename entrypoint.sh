@@ -3,7 +3,7 @@ set -e
 
 rpk redpanda start \
   --smp 1 \
-  --memory 700MiB \
+  --memory 400MiB \
   --reserve-memory 0MiB \
   --overprovisioned \
   --check=false &
@@ -12,6 +12,6 @@ rpk redpanda start \
 sleep 5
 
 /usr/local/bin/boggle-backend &  
-/usr/local/bin/boggle-kafka &  
+# /usr/local/bin/boggle-kafka &  
 
 wait

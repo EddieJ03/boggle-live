@@ -10,6 +10,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
+
+	 "boggle-backend/spectator"
 )
 
 var (
@@ -50,7 +52,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/spectator", spectator.HandleSpectatorConnections)
 	mux.HandleFunc("/", handleConnections)
+	
 	handler := cors.Default().Handler(mux)
 
 	server := &http.Server{

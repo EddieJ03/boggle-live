@@ -16,14 +16,14 @@ RUN curl -sLf https://dl.redpanda.com/nzc4ZYQK3WRGd9sy/redpanda/cfg/setup/bash.d
 
 
 COPY boggle-backend/boggle-backend /usr/local/bin/boggle-backend
-COPY boggle-kafka/boggle-kafka /usr/local/bin/boggle-kafka
+# COPY boggle-kafka/boggle-kafka /usr/local/bin/boggle-kafka
 COPY redpanda.yaml /etc/redpanda/redpanda.yaml
-RUN chmod +x /usr/local/bin/boggle-backend /usr/local/bin/boggle-kafka
+RUN chmod +x /usr/local/bin/boggle-backend 
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 WORKDIR /var/lib/redpanda
-EXPOSE 9092 5050 7001
+EXPOSE 9092 5050
 
 CMD ["/entrypoint.sh"]
