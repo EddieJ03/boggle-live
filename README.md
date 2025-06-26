@@ -1,9 +1,5 @@
 # Go Backend
 
-To build Boggle Kafka server: 
-- cd into `boggle-kafka` then run `go build`
-- If building for Docker container, prefix above command with `GOOS=linux GOARCH=amd64 `
-
 To build Boggle Backend server: 
 - cd into `boggle-backend` then run `go build`
 - If building for Docker container, prefix above command with `GOOS=linux GOARCH=amd64 `
